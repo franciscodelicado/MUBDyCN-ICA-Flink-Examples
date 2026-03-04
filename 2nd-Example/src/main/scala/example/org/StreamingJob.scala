@@ -48,7 +48,7 @@ object StreamingJob {
 
     // 3.- Transformations on the DataStream
     sensorTempData    // Obtain a string representation of the temperature readings and print it
-      .map(r => "input: TEMP" + r)
+      .map(r => "input: " + r)
       .print()
     
     sensorTempData    // Split the humidity readings by the digit "5" and print the resulting array of strings
