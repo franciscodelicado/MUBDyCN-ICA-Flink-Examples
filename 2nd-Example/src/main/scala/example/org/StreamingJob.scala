@@ -44,7 +44,6 @@ object StreamingJob {
 
     // 2.- Set up the Source of DataStream
     val sensorTempData: DataStream[SensorTempReading] = env.addSource(new SensorTemp(4, 5000L))
-    val sensorHumData: DataStream[SensorHumReading] = env.addSource(new SensorHum(4, 5000L))
 
     // 3.- Transformations on the DataStream
     sensorTempData    // Obtain a string representation of the temperature readings and print it
