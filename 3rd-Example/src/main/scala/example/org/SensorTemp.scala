@@ -3,10 +3,13 @@ package example.org
 import org.apache.flink.streaming.api.functions.source.SourceFunction
 import scala.util.Random
 
-class SensorSource(numSensors: Int) extends SourceFunction[SensorReading] {
+class SensorTemp(numSensors: Int, period: Long)
+    extends SourceFunction[SensorTempReading] {
   var running: Boolean = true
 
-  override def run(ctx: SourceFunction.SourceContext[SensorReading]): Unit = {
+  override def run(
+      ctx: SourceFunction.SourceContext[SensorTempReading]
+  ): Unit = {
     val rand = new Random()
     var curTemps = (1 to numSensors).map(i =>
       (
@@ -19,8 +22,8 @@ class SensorSource(numSensors: Int) extends SourceFunction[SensorReading] {
       curTemps = curTemps.map(t =>
         (t._1, math.round((t._2 + rand.nextGaussian() * 20) * 100) / 100.0)
       )
-      curTemps.foreach(t => ctx.collect(SensorReading(t._1, t._2)))
-      Thread.sleep(1000L)
+      curTemps.foreach(t => ctx.collect(SensorTempReading(t._1, t._2)))
+      Thread.sleep(period)
     }
   }
 
@@ -29,4 +32,4 @@ class SensorSource(numSensors: Int) extends SourceFunction[SensorReading] {
   }
 }
 
-case class SensorReading(id: String, temperature: Double)
+case class SensorTempReading(id: String, temperature: Double)
