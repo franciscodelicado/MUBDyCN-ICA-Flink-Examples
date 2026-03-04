@@ -46,53 +46,30 @@ object StreamingJob {
     val sensorTempData: DataStream[SensorTempReading] = env.addSource(new SensorTemp(4, 5000L))
     val sensorHumData: DataStream[SensorHumReading] = env.addSource(new SensorHum(4, 5000L))
 
-    // 3.- Transformations on the DataStream
-    sensorTempData    // Obtain a string representation of the temperature readings and print it
+    // 3.- Transformations on the DataStream    
+    val Temps: DataStream[SensorTempReading] = sensorTempData
+      .keyBy(_.id)
+
+    val Hums: DataStream[SensorHumReading] = sensorHumData
+      .keyBy(_.id)
+
+    val TempsAndHums: DataStream[SensorTempHumReading] = Temps
+      .connect(Hums)
+      .process(new SensorTempHumWithTimeout(2000L))
+  
+    // 4.- Set up the Sink of DataStream
+    sensorTempData
       .map(r => "input: TEMP" + r)
       .print()
     
-    sensorTempData    // Split the humidity readings by the digit "5" and print the resulting array of strings
-      .map(r => "FlatMap TEMP: "+ r.temperature.toString())
-      .flatMap(str => str.split("5"))
+    sensorHumData
+      .map(r => "input: HUM" + r)
       .print()
 
 
-    sensorTempData    // Filter Temperature readings bellow 50 and print the resulting readings
-      .filter(r => r.temperature < 50)
-      .map(r => "Filter TEMP:" + r)
-      .print()
-
-    sensorTempData    // Key the temperature readings by sensor id and print the resulting keyed stream
-      .keyBy(_.id)
-      .reduce((r1, r2) => SensorTempReading(r1.id, r1.temperature + r2.temperature))
-      .map(r => "KeyBy & Reduce TEMP: " + r)
-      .print()
-
-
-
-    // val Temps: DataStream[SensorTempReading] = sensorTempData
-    //   .keyBy(_.id)
-
-    // val Hums: DataStream[SensorHumReading] = sensorHumData
-    //   .keyBy(_.id)
-
-    // val TempsAndHums: DataStream[SensorTempHumReading] = Temps
-    //   .connect(Hums)
-    //   .process(new SensorTempHumWithTimeout(2000L))
-  
-    // // 4.- Set up the Sink of DataStream
-    // sensorTempData
-    //   .map(r => "input: TEMP" + r)
-    //   .print()
-    
-    // sensorHumData
-    //   .map(r => "input: HUM" + r)
-    //   .print()
-
-
-    // TempsAndHums
-    // .map(r => "output: " + r)
-    // .print() 
+    TempsAndHums
+    .map(r => "output: " + r)
+    .print() 
 
     // 5.- execute program
     env.execute("Flink Streaming Scala API Skeleton")
