@@ -1,0 +1,96 @@
+services:
+  jobmanager:
+    labels:
+      org.fiware: "tutorial"
+    image: flink:${FLINK_VERSION}
+    platform: linux/amd64
+    hostname: jobmanager
+    container_name: flink-jobmanager
+    expose:
+      - "${FLINK_WEB_APP_PORT}"
+      - "${FLINK_JOB_MANAGER_PORT}"
+      - "${FLINK_SERVICE_PORT}"
+    ports:
+      - "${FLINK_JOB_MANAGER_PORT}:${FLINK_JOB_MANAGER_PORT}"
+      - "${FLINK_WEB_APP_PORT}:${FLINK_WEB_APP_PORT}"
+    networks:
+      - default
+    command: jobmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager
+      - FLINK_LOG_DIR=/opt/flink/log
+
+    volumes:
+      - ./log4j-console.properties:/opt/flink/conf/log4j-console.properties
+      - ./flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
+  taskmanager:
+    labels:
+      org.fiware: "tutorial"
+    image: flink:${FLINK_VERSION}
+    platform: linux/amd64
+    hostname: taskmanager
+    container_name: flink-taskmanager
+    ports:
+      - "${FLINK_TASK_MANAGER_PORT_1}:${FLINK_TASK_MANAGER_PORT_1}"
+      - "${FLINK_TASK_MANAGER_PORT_2}:${FLINK_TASK_MANAGER_PORT_2}"
+      - "${FLINK_SERVICE_PORT}:${FLINK_SERVICE_PORT}"
+    networks:
+      - default
+    depends_on:
+      - jobmanager
+    command: taskmanager
+    links:
+      - "jobmanager:jobmanager"
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager
+      - FLINK_LOG_DIR=/opt/flink/log
+    volumes:
+      - ./log4j-console.properties:/opt/flink/conf/log4j-console.properties
+      - ./flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
+
+  # Cassandra DataBase
+  cassandra:
+    labels:
+      org.fiware: "tutorial"
+    image: cassandra:${CASSANDRA_VERSION}
+    hostname: cassandra
+    container_name: cassandra
+    ports:
+      - "${CASSANDRA_PORT}:${CASSANDRA_PORT}" # localhost:9042
+    networks:
+      - default
+    volumes:
+      - cassandra:/var/lib/cassandra
+    environment:
+      - CASSANDRA_CLUSTER_NAME=cloudinfra
+
+  # Grafana
+  grafana:
+    labels:
+      org.fiware: "tutorial"
+    image: grafana/grafana:${GRAFANA_VERSION}
+    hostname: grafana
+    container_name: grafana
+    ports:
+      - "${GRAFANA_UI_PORT}:${GRAFANA_UI_PORT}" # localhost:3000
+    networks:
+      - default
+    depends_on:
+      - cassandra
+    environment:
+      - GF_INSTALL_PLUGINS=hadesarchitect-cassandra-datasource
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana:/var/lib/grafana
+
+networks:
+  default:
+    labels:
+      org.fiware: "tutorial"
+    ipam:
+      config:
+        - subnet: 172.18.100.0/24
+
+volumes:
+  cassandra: ~
+  grafana: ~
