@@ -36,6 +36,12 @@ import org.apache.flink.util.Collector
  * If you change the name of the main class (with the public static void main(String[] args))
  * method, change the respective entry in the POM.xml file (simply search for 'mainClass').
  */
+
+
+/**
+  * This example demostrates fundamental transformations on a DataStream, such as map, flatMap, filter, keyBy and reduce.
+  */
+  
 object StreamingJob {
   def main(args: Array[String]) {
 

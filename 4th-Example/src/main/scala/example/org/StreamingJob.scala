@@ -19,7 +19,6 @@
 package example.org
 
 import org.apache.flink.api.common.state.{ValueState, ValueStateDescriptor}
-import org.apache.flink.api.common.functions.RichMapFunction
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction
 import org.apache.flink.streaming.api.scala._
@@ -37,6 +36,12 @@ import org.apache.flink.util.Collector
  * If you change the name of the main class (with the public static void main(String[] args))
  * method, change the respective entry in the POM.xml file (simply search for 'mainClass').
  */
+
+/**
+  * This example demonstrates how to use the connect operator and KeyedCoProcessFunction to combine two streams of sensor readings (temperature and humidity) based on their sensor ID. 
+  * The SensorTempHumWithTimeout function outputs a combined reading of temperature and humidity for each sensor. If a reading from one stream is received and there is no corresponding reading from the other stream within a specified timeout, it outputs a combined reading with NaN for the missing value.
+  * 
+  */
 object StreamingJob {
   def main(args: Array[String]) {
 
@@ -54,10 +59,9 @@ object StreamingJob {
     val Hums: DataStream[SensorHumReading] = sensorHumData
       .keyBy(_.id)
 
-    val AverageTempsAndHums: DataStream[AverageSensorTempHumReading] = Temps
+    val TempsAndHums: DataStream[SensorTempHumReading] = Temps
       .connect(Hums)
-      .process(new SensorTempHumWithTimeout(5000L))
-      .map(new AverageTempHum)
+      .process(new SensorTempHumWithTimeout(2000L))
   
     // 4.- Set up the Sink of DataStream
     sensorTempData
@@ -69,7 +73,7 @@ object StreamingJob {
       .print()
 
 
-    AverageTempsAndHums
+    TempsAndHums
     .map(r => "output: " + r)
     .print() 
 
@@ -134,8 +138,7 @@ object StreamingJob {
     } 
 
     private def setupTimeout(ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, timeout: Long): Unit = {
-      val timeoutTimestamp: java.lang.Long = timerState.value()
-      if (timeoutTimestamp == null) {
+      if (timerState.value() == null) {
           val timeoutTimestamp = ctx.timerService().currentProcessingTime() + timeout
           ctx.timerService().registerProcessingTimeTimer(timeoutTimestamp)
           timerState.update(timeoutTimestamp)
@@ -143,7 +146,7 @@ object StreamingJob {
     }
 
     private def clearTimeout(ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context): Unit = {
-      val timeoutTimestamp: java.lang.Long = timerState.value()
+      val timeoutTimestamp = timerState.value()
       if (timeoutTimestamp != null) {
         ctx.timerService().deleteProcessingTimeTimer(timeoutTimestamp)
         timerState.clear()
@@ -151,28 +154,7 @@ object StreamingJob {
     }
   }
 
-
-  class AverageTempHum extends RichMapFunction[SensorTempHumReading, AverageSensorTempHumReading] {
-    private var count: Long = 0
-    private var sumTemp: Double = 0.0
-    private var sumHum: Double = 0.0
-
-
-    override def map(value: SensorTempHumReading): AverageSensorTempHumReading = {
-      count += 1
-      if (!value.temperature.isNaN) {
-        sumTemp += value.temperature
-      }
-      if (!value.humidity.isNaN) {
-        sumHum += value.humidity
-      }
-      AverageSensorTempHumReading(value.id, value.temperature, value.humidity, sumTemp / count, sumHum / count)
-      
-    }
-  }
-
   case class SensorTempHumReading(id: String, temperature: Double, humidity: Double)
-  case class AverageSensorTempHumReading(id: String, temperature: Double, humidity: Double, averageTemperature: Double, averageHumidity: Double)
 
 }
 

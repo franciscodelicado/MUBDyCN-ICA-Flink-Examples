@@ -19,6 +19,7 @@
 package example.org
 
 import org.apache.flink.api.common.state.{ValueState, ValueStateDescriptor}
+import org.apache.flink.api.common.functions.RichMapFunction
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction
 import org.apache.flink.streaming.api.scala._
@@ -36,6 +37,11 @@ import org.apache.flink.util.Collector
  * If you change the name of the main class (with the public static void main(String[] args))
  * method, change the respective entry in the POM.xml file (simply search for 'mainClass').
  */
+
+/**
+  * This example demonstrates how to compute the average temperature for each sensor using a RichMapFunction with ValueState to maintain the count and sum of temperatures for each sensor. 
+  * The AverageTemp function updates the count and sum of temperatures for each sensor and outputs an AverageSensorTempReading containing the sensor ID, the current temperature reading, and the average temperature for that sensor.
+  */
 object StreamingJob {
   def main(args: Array[String]) {
 
@@ -44,111 +50,47 @@ object StreamingJob {
 
     // 2.- Set up the Source of DataStream
     val sensorTempData: DataStream[SensorTempReading] = env.addSource(new SensorTemp(4, 5000L))
-    val sensorHumData: DataStream[SensorHumReading] = env.addSource(new SensorHum(4, 5000L))
 
     // 3.- Transformations on the DataStream    
-    val Temps: DataStream[SensorTempReading] = sensorTempData
-      .keyBy(_.id)
-
-    val Hums: DataStream[SensorHumReading] = sensorHumData
-      .keyBy(_.id)
-
-    val TempsAndHums: DataStream[SensorTempHumReading] = Temps
-      .connect(Hums)
-      .process(new SensorTempHumWithTimeout(2000L))
-  
-    // 4.- Set up the Sink of DataStream
     sensorTempData
-      .map(r => "input: TEMP" + r)
-      .print()
-    
-    sensorHumData
-      .map(r => "input: HUM" + r)
-      .print()
-
-
-    TempsAndHums
-    .map(r => "output: " + r)
-    .print() 
+      .keyBy(_.id)
+      .map(new AverageTemp) // Compute the average temperature for each sensor and output 
+      .map(r => "output: " + r)
+      .print() 
 
     // 5.- execute program
     env.execute("Flink Streaming Scala API Skeleton")
   }
 
 
-  /**
-   * A KeyedCoProcessFunction that connects two streams of SensorTempReading and SensorHumReading and outputs a stream of SensorTempHumReading
-   * containing the latest temperature and humidity readings for each sensor. If a reading from one stream
-   * is received and there is no corresponding reading from the other stream within a specified timeout, it outputs a SensorTempHumReading with NaN for the missing value.
-   */
-  class SensorTempHumWithTimeout(timeout: Long) extends KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading] {
-    private var lastTempState: ValueState[SensorTempReading] = _
-    private var lastHumState: ValueState[SensorHumReading] = _
-    private var timerState: ValueState[Long] = _
-    private var _timeout: Long = timeout
+  
+
+  class AverageTemp extends RichMapFunction[SensorTempReading, AverageSensorTempReading] {
+    private var count: ValueState[Long] = _ 
+    private var sumTemp: ValueState[Double] = _
+  
 
     override def open(parameters: Configuration): Unit = {
-      lastTempState = getRuntimeContext.getState(new ValueStateDescriptor[SensorTempReading]("lastTempState", classOf[SensorTempReading]))
-      lastHumState = getRuntimeContext.getState(new ValueStateDescriptor[SensorHumReading]("lastHumState", classOf[SensorHumReading]))
-      timerState = getRuntimeContext.getState(new ValueStateDescriptor[Long]("timerState", classOf[Long]))
-    }
-
-    override def processElement1(temp: SensorTempReading, ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, out: Collector[SensorTempHumReading]): Unit = {
-      val hum = lastHumState.value()
-      if (hum != null) {
-        out.collect(SensorTempHumReading(temp.id, temp.temperature, hum.humidity))
-        lastHumState.clear()
-        clearTimeout(ctx)
-      } else {
-        lastTempState.update(temp)
-        setupTimeout(ctx, _timeout)
-      }
-    }
-
-    override def processElement2(hum: SensorHumReading, ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, out: Collector[SensorTempHumReading]): Unit = {
-      val temp = lastTempState.value()
-      if (temp != null) {
-        out.collect(SensorTempHumReading(hum.id, temp.temperature, hum.humidity))
-        lastTempState.clear()
-        clearTimeout(ctx)
-      } else {
-        lastHumState.update(hum)
-        setupTimeout(ctx, _timeout)
-      }
-    }
-
-    override def onTimer(timestamp: Long, ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#OnTimerContext, out: Collector[SensorTempHumReading]): Unit = {
-
-      if (timerState.value() == timestamp) { //The timer is triggered for the current key
-        if (lastTempState.value() != null) { // There is a temp reading but no hum reading
-          out.collect(SensorTempHumReading(lastTempState.value().id, lastTempState.value().temperature, Double.NaN))
-          lastTempState.clear()
-        }
-        if (lastHumState.value() != null) { // There is a hum reading but no temp reading
-          out.collect(SensorTempHumReading(lastHumState.value().id, Double.NaN, lastHumState.value().humidity))
-          lastHumState.clear()
-        }
-      }
+      count = getRuntimeContext.getState(new ValueStateDescriptor[Long]("count", classOf[Long]))
+      sumTemp = getRuntimeContext.getState(new ValueStateDescriptor[Double]("sumTemp", classOf[Double]))
     } 
 
-    private def setupTimeout(ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, timeout: Long): Unit = {
-      if (timerState.value() == null) {
-          val timeoutTimestamp = ctx.timerService().currentProcessingTime() + timeout
-          ctx.timerService().registerProcessingTimeTimer(timeoutTimestamp)
-          timerState.update(timeoutTimestamp)
-        }
-    }
-
-    private def clearTimeout(ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context): Unit = {
-      val timeoutTimestamp = timerState.value()
-      if (timeoutTimestamp != null) {
-        ctx.timerService().deleteProcessingTimeTimer(timeoutTimestamp)
-        timerState.clear()
+    override def map(value: SensorTempReading): AverageSensorTempReading = {
+      val countValue: java.lang.Long = count.value()
+      if (countValue == null) { // first reading for this key, initialize state
+        count.update(0L)
+        sumTemp.update(0.0)
       }
+      val newCount = count.value() + 1
+      count.update(newCount)
+      if (!value.temperature.isNaN) {
+        val newSumTemp = sumTemp.value() + value.temperature
+        sumTemp.update(newSumTemp)
+      }
+      AverageSensorTempReading(value.id, value.temperature, sumTemp.value() / count.value())
     }
   }
-
-  case class SensorTempHumReading(id: String, temperature: Double, humidity: Double)
+  case class AverageSensorTempReading(id: String, temperature: Double, averageTemperature: Double)
 
 }
 
