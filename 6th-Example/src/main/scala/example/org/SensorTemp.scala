@@ -8,12 +8,8 @@ import java.time.format.DateTimeFormatter
 class SensorTemp(numSensors: Int, period: Long)
     extends SourceFunction[SensorTempReading] {
   var running: Boolean = true
-
-  private def currentTimestampUtcPlusOne(): String =
     
-  override def run(
-      ctx: SourceFunction.SourceContext[SensorTempReading]
-  ): Unit = {
+  override def run(ctx: SourceFunction.SourceContext[SensorTempReading]): Unit = {
     val rand = new Random()
     var curTemps = (1 to numSensors).map(i =>
       (

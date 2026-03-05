@@ -18,14 +18,15 @@
 
 package example.org
 
-import org.apache.flink.api.common.state.{ValueState, ValueStateDescriptor}
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor
 import org.apache.flink.streaming.api.scala.function.ProcessWindowFunction
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.api.windowing.assigners.SlidingProcessingTimeWindows
-import org.apache.flink.configuration.Configuration
-import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction
 import org.apache.flink.streaming.api.scala._
+import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.util.Collector
 
 
@@ -35,7 +36,7 @@ import org.apache.flink.util.Collector
   * IMPORTANT: The Watermark is generated based on the timestamp field of the SensorTempReading, which is in ISO_OFFSET_DATE_TIME format. The auto watermark interval is set to 1 second to ensure timely processing of the data.
   */
 object StreamingJob {
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
 
     // 1.- set up the streaming execution environment
     val env = StreamExecutionEnvironment.getExecutionEnvironment
@@ -44,17 +45,20 @@ object StreamingJob {
     // Set the auto watermark interval to 5 seconds to ensure that watermarks are generated and emitted at regular intervals, allowing for timely processing of the data and handling of late events. This is important for the correct functioning of event time windows and ensuring that results are produced in a timely manner.
     env.getConfig.setAutoWatermarkInterval(5000L)
 
-    val waterMarkStrategy = WatermarkStrategy
-      .forBoundedOutOfOrderness[SensorTempReading](Duration.ofSeconds(5))
-      .withTimestampAssigner(new SerializableTimestampAssigner[SensorTempReading] {
-        override def extractTimestamp(element: SensorTempReading, recordTimestamp: Long): Long = {
-          // Parse the timestamp string in ISO_OFFSET_DATE_TIME format and convert it to milliseconds since epoch
-          ZonedDateTime.parse(element.timestamp, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toInstant.toEpochMilli
-        }
-      })
-
     // 2.- Set up the Source of DataStream
     val sensorTempData: DataStream[SensorTempReading] = env.addSource(new SensorTemp(2, 5000L))
+
+    val sensorTempDataWithTimestamps = sensorTempData
+      .assignTimestampsAndWatermarks(
+        new BoundedOutOfOrdernessTimestampExtractor[SensorTempReading](Time.seconds(5)) {
+          override def extractTimestamp(element: SensorTempReading): Long = {
+            ZonedDateTime
+              .parse(element.timestamp, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+              .toInstant
+              .toEpochMilli
+          }
+        }
+      )
       
     // Print the input data stream for debugging purposes
     sensorTempData
@@ -63,8 +67,7 @@ object StreamingJob {
       .print()
     
     // 3.- Transformations on the DataStream    
-    sensorTempData
-      .assignTimestampsAndWatermarks(waterMarkStrategy)
+    sensorTempDataWithTimestamps
       .keyBy(_.id)
       .window(SlidingProcessingTimeWindows.of(Time.seconds(10), Time.seconds(5))) // Apply a sliding window of 10 seconds with a slide of 5 seconds
       .process(new AverageSlideWindowTemp) // Compute the average temperature for each sensor and output
