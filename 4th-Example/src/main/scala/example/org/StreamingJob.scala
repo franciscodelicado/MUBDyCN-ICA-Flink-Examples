@@ -78,7 +78,7 @@ object StreamingJob {
     .print() 
 
     // 5.- execute program
-    env.execute("Flink Streaming Scala API Skeleton")
+    env.execute("4th-Example")
   }
 
 
@@ -102,7 +102,7 @@ object StreamingJob {
     override def processElement1(temp: SensorTempReading, ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, out: Collector[SensorTempHumReading]): Unit = {
       val hum = lastHumState.value()
       if (hum != null) {
-        out.collect(SensorTempHumReading(temp.id, temp.temperature, hum.humidity))
+        out.collect(SensorTempHumReading(temp.id, temp.temperature, hum.humidity).computeHeatIndex())
         lastHumState.clear()
         clearTimeout(ctx)
       } else {
@@ -114,7 +114,7 @@ object StreamingJob {
     override def processElement2(hum: SensorHumReading, ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, out: Collector[SensorTempHumReading]): Unit = {
       val temp = lastTempState.value()
       if (temp != null) {
-        out.collect(SensorTempHumReading(hum.id, temp.temperature, hum.humidity))
+        out.collect(SensorTempHumReading(hum.id, temp.temperature, hum.humidity).computeHeatIndex())
         lastTempState.clear()
         clearTimeout(ctx)
       } else {
@@ -127,18 +127,19 @@ object StreamingJob {
 
       if (timerState.value() == timestamp) { //The timer is triggered for the current key
         if (lastTempState.value() != null) { // There is a temp reading but no hum reading
-          out.collect(SensorTempHumReading(lastTempState.value().id, lastTempState.value().temperature, Double.NaN))
+          out.collect(SensorTempHumReading(lastTempState.value().id, lastTempState.value().temperature, Double.NaN).computeHeatIndex())
           lastTempState.clear()
         }
         if (lastHumState.value() != null) { // There is a hum reading but no temp reading
-          out.collect(SensorTempHumReading(lastHumState.value().id, Double.NaN, lastHumState.value().humidity))
+          out.collect(SensorTempHumReading(lastHumState.value().id, Double.NaN, lastHumState.value().humidity).computeHeatIndex())
           lastHumState.clear()
         }
       }
     } 
 
     private def setupTimeout(ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, timeout: Long): Unit = {
-      if (timerState.value() == null) {
+      val timeoutTimestamp: java.lang.Long = timerState.value()
+      if (timeoutTimestamp == null) {
           val timeoutTimestamp = ctx.timerService().currentProcessingTime() + timeout
           ctx.timerService().registerProcessingTimeTimer(timeoutTimestamp)
           timerState.update(timeoutTimestamp)
@@ -146,7 +147,7 @@ object StreamingJob {
     }
 
     private def clearTimeout(ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context): Unit = {
-      val timeoutTimestamp = timerState.value()
+      val timeoutTimestamp: java.lang.Long = timerState.value()
       if (timeoutTimestamp != null) {
         ctx.timerService().deleteProcessingTimeTimer(timeoutTimestamp)
         timerState.clear()
@@ -154,7 +155,18 @@ object StreamingJob {
     }
   }
 
-  case class SensorTempHumReading(id: String, temperature: Double, humidity: Double)
+  case class SensorTempHumReading(id: String, temperature: Double, humidity: Double, heatIndex: Double = Double.NaN) {
+    def computeHeatIndex(): SensorTempHumReading = {
+      if (!temperature.isNaN && !humidity.isNaN) {
+        val t = temperature
+        val rh = humidity
+        val hi = -8.784695 + 1.61139411 * t + 2.338549 * rh - 0.14611605 * t * rh - 0.012308094 * math.pow(t, 2) - 0.016424828 * math.pow(rh, 2) + 0.002211732 * math.pow(t, 2) * rh + 0.00072546 * t * math.pow(rh, 2) - 0.000003582 * math.pow(t, 2) * math.pow(rh, 2)
+        this.copy(heatIndex = hi)
+      } else {
+        this
+      }
+    }
+  }
 
 }
 

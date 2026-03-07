@@ -60,7 +60,7 @@ object StreamingJob {
       .print()
 
     // 5.- execute program
-    env.execute("Flink Streaming Scala API Skeleton")
+    env.execute("5th-Example")
   }
 
 
