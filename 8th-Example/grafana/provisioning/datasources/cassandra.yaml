@@ -1,0 +1,18 @@
+apiVersion: 1
+
+datasources:
+  - name: Cassandra
+    uid: cassandra-ds
+    type: hadesarchitect-cassandra-datasource
+    access: proxy
+    url: cassandra:9042
+    isDefault: false
+    editable: true
+    jsonData:
+      keyspace: flinkdb
+      localdc: datacenter1
+      consistency: LOCAL_ONE
+      protocolVersion: 4
+      user: cassandra
+    secureJsonData:
+      password: cassandra

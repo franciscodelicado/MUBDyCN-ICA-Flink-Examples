@@ -1,0 +1,368 @@
+#!/bin/bash
+#
+# Script to import data into the FIWARE Orion Context Broker
+
+
+set -e
+
+echo -e "\n🚀 Importing data into \033[1;34mOrion Context Broker\033[0m\n"
+
+# Loading Buildings entities
+
+curl -s -o /dev/null -X POST \
+    'http://orion-v2:1026/v2/op/update' \
+    -H 'Content-Type: application/json' \
+    -g -d'{
+        "actionType": "append",
+        "entities": [
+            {
+                "id": "urn:ngsi-ld:Building:ToscanaI",
+                "type": "Building",
+                "name": { "type": "Text", "value": "Toscana I" },
+                "address": {
+                    "type": "PostalAddress",
+                    "value": {
+                        "streetAddress": "Rosario St., 6",
+                        "addressLocality": "Albacete",
+                        "addressRegion": "Castilla-La Mancha",
+                        "postalCode": "02001",
+                        "addressCountry": "Spain"
+                    }
+                }, 
+                "location" : {
+                    "type": "geo:json",
+                    "value": {
+                        "type": "Point",
+                        "coordinates": [ -1.8556169873103332, 38.99541287827867]
+                    }
+                }
+            }
+        ]
+    }'
+
+
+# Loading Housing entities
+curl -s -o /dev/null -X POST \
+  'http://orion-v2:1026/v2/op/update' \
+  -H 'Content-Type: application/json' \
+  -g -d'{
+    "actionType": "append",
+    "entities": [
+        {
+            "id": "urn:ngsi-ld:ToscanaI:Flat1A",
+            "type": "Housing",
+            "name": { "type": "Text", "value": "ToscanaI 1A" },
+            "floor": { "type": "Number", "value": 1 },
+            "rooms": { "type": "Number", "value": 4 },
+            "refBuilding": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:Building:ToscanaI"
+            }
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaI:Flat1B",
+            "type": "Housing",
+            "name": { "type": "Text", "value": "ToscanaI 1B" },
+            "floor": { "type": "Number", "value": 1 },
+            "rooms": { "type": "Number", "value": 4 },
+            "refBuilding": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:Building:ToscanaI"
+            }
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaI:Flat2A",
+            "type": "Housing",
+            "name": { "type": "Text", "value": "ToscanaI 2A" },
+            "floor": { "type": "Number", "value": 2 },
+            "rooms": { "type": "Number", "value": 4 },
+            "refBuilding": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:Building:ToscanaI"
+            }
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaI:Flat2B",
+            "type": "Housing",
+            "name": { "type": "Text", "value": "ToscanaI 2B" },
+            "floor": { "type": "Number", "value": 2 },
+            "rooms": { "type": "Number", "value": 4 },
+            "refBuilding": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:Building:ToscanaI"
+            }
+        }
+    ]
+}'
+
+# Loading Rooms entities for ToscanaI Flat 1A
+curl -s -o /dev/null -X POST \
+  'http://orion-v2:1026/v2/op/update' \
+  -H 'Content-Type: application/json' \
+  -g -d'{
+    "actionType": "append",
+    "entities": [
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat1A:livingroom",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Living Room" },
+            "area": { "type": "Number", "value": 35.5,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK" }
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat1A"
+            }
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat1A:kitchen",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Kitchen" },
+            "area": { "type": "Number", "value": 15.0,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK" }
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat1A"
+            }            
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat1A:bedroom1",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Bedroom 1" },
+            "area": { "type": "Number", "value": 20.0,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK" }
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat1A"
+            }
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat1A:bathroom",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Bathroom" },
+            "area": { "type": "Number", "value": 8.0,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK"}
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat1A"
+            }
+
+        }
+    ]
+}'
+
+#Loading Rooms entities for ToscanaI Flat 1B
+curl -s -o /dev/null -X POST \
+  'http://orion-v2:1026/v2/op/update' \
+  -H 'Content-Type: application/json' \
+  -g -d'{
+    "actionType": "append",
+    "entities": [
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat1B:livingroom",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Living Room" },
+            "area": { "type": "Number", "value": 35.5,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK" }
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat1B"
+            }
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat1B:kitchen",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Kitchen" },
+            "area": { "type": "Number", "value": 15.0,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK" }
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat1B"
+            }            
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat1B:bedroom1",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Bedroom 1" },
+            "area": { "type": "Number", "value": 20.0,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK" }
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat1B"
+            }
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat1B:bathroom",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Bathroom" },
+            "area": { "type": "Number", "value": 8.0,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK"}
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat1B"
+            }
+
+        }
+    ]
+}'
+
+# Loading Rooms entities for ToscanaI Flat 2A
+curl -s -o /dev/null -X POST \
+  'http://orion-v2:1026/v2/op/update' \
+  -H 'Content-Type: application/json' \
+  -g -d'{
+    "actionType": "append",
+    "entities": [
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat2A:livingroom",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Living Room" },
+            "area": { "type": "Number", "value": 35.5,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK" }
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat2A"
+            }
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat2A:kitchen",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Kitchen" },
+            "area": { "type": "Number", "value": 15.0,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK" }
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat2A"
+            }            
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat2A:bedroom1",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Bedroom 1" },
+            "area": { "type": "Number", "value": 20.0,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK" }
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat2A"
+            }
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat2A:bathroom",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Bathroom" },
+            "area": { "type": "Number", "value": 8.0,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK"}
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat2A"
+            }
+
+        }
+    ]
+}'  
+
+# Loading Rooms entities for ToscanaI Flat 2B
+curl -s -o /dev/null -X POST \
+  'http://orion-v2:1026/v2/op/update' \
+  -H 'Content-Type: application/json' \
+  -g -d'{
+    "actionType": "append",
+    "entities": [
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat2B:livingroom",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Living Room" },
+            "area": { "type": "Number", "value": 35.5,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK" }
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat2B"
+            }
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat2B:kitchen",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Kitchen" },
+            "area": { "type": "Number", "value": 15.0,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK" }
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat2B"
+            }            
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat2B:bedroom1",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Bedroom 1" },
+            "area": { "type": "Number", "value": 20.0,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK" }
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat2B"
+            }
+        },
+        {
+            "id": "urn:ngsi-ld:ToscanaIFlat2B:bathroom",
+            "type": "Room",
+            "name": { "type": "Text", "value": "Bathroom" },
+            "area": { "type": "Number", "value": 8.0,
+                "metadata": {
+                    "unitCode": { "type": "Text", "value": "MTK"}
+                }
+            },
+            "refHousing": {
+                "type": "Relationship",
+                "value": "urn:ngsi-ld:ToscanaI:Flat2B"
+            }
+
+        }
+    ]
+}'
+
+
+
+echo -e "\n✅ Data import completed\n"

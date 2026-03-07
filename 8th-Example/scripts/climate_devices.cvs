@@ -1,0 +1,25 @@
+## CSV file for AC unit emulator.
+## The structure of the file is:
+##          <api_key>:<device_id>:<probability_of_error>
+## where:
+##   - <api_key> is the API key assigned to the AC unit device to authenticate in the IoT Agent
+##   - <device_id> is the identifier of the AC unit device
+##   - <probability_of_error> is a float number between 0 and 1 indicating the probability that the device
+##     generates an erroneous measurement (e.g., a temperature or humidity value out of the expected range)
+##
+acunitapikey:ac01ToscanaIFlat1A:0.05
+#acunitapikey:ac02ToscanaIFlat1A:0.03
+# acunitapikey:ac03ToscanaIFlat1A:0.01
+# acunitapikey:ac04ToscanaIFlat1A:0.02
+# acunitapikey:ac01ToscanaIFlat1B:0.04
+# acunitapikey:ac02ToscanaIFlat1B:0.005
+# acunitapikey:ac03ToscanaIFlat1B:0.02
+# acunitapikey:ac04ToscanaIFlat1B:0.03
+# acunitapikey:ac01ToscanaIFlat2A:0.01
+# acunitapikey:ac02ToscanaIFlat2A:0.04
+# acunitapikey:ac03ToscanaIFlat2A:0.02
+# acunitapikey:ac04ToscanaIFlat2A:0.03
+# acunitapikey:ac01ToscanaIFlat2B:0.05
+# acunitapikey:ac02ToscanaIFlat2B:0.02
+# acunitapikey:ac03ToscanaIFlat2B:0.01
+# acunitapikey:ac04ToscanaIFlat2B:0.04

@@ -1,0 +1,67 @@
+#General settings
+@orion=localhost:1026
+@iotagent-north=localhost:4041
+@iotagent-south=localhost:7896
+
+### Check that Orion is running
+GET http://{{orion}}/version
+Accept: application/json
+
+### List all entities
+GET http://{{orion}}/v2/entities?options=keyValues
+Accept: application/json
+
+### List all entities
+GET http://{{orion}}/v2/entities/AC:ac01ToscanaIFlat1A?options=keyValues
+Accept: application/json
+fiware-service: openiot
+fiware-servicepath: /
+
+### Get service information from IoT Agent North
+GET http://{{iotagent-north}}/iot/services
+Content-Type: application/json
+fiware-service: openiot
+fiware-servicepath: /
+
+### Get devices information from IoT Agent South
+GET http://{{iotagent-north}}/iot/devices
+Content-Type: application/json
+fiware-service: openiot
+fiware-servicepath: /
+
+### Add subscription from Orion to Flink job
+## It's necessary set "condition" to avoid send context changes to Flink when these are produced by Flink average updates, producing an infinite loop of updates between Orion and Flink.
+POST http://{{orion}}/v2/subscriptions
+Content-Type: application/json
+fiware-service: openiot
+fiware-servicepath: /
+
+{
+  "description": "Notify Flink of all context changes",
+  "subject": {
+    "entities": [
+      {
+        "idPattern": ".*"
+      }
+    ],
+    "condition": {
+      "attrs": [
+        "temperature",
+        "humidity"
+      ]
+    }
+  },
+  "notification": {
+    "http": {
+      "url": "http://flink-taskmanager:9001"
+    }
+    
+  }
+}
+
+
+### List all subscriptions in Orion
+GET http://{{orion}}/v2/subscriptions
+Accept: application/json
+fiware-service: openiot
+fiware-servicepath: /   

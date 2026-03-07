@@ -1,0 +1,239 @@
+#!/bin/bash
+#
+#  curl commands to reload the data from the previous tutorial
+#
+#
+
+set -e
+
+
+
+
+
+printf "⏳ Provisioning IoT devices "
+
+
+##################### SENSORS #########################
+## 0.- Set up Devices with fixed attributes in Orion
+## 1.- Provision a service for Sensors
+## 2.- Provision Devices (sensors) in IoT Agent
+
+### 0.- Set up Devices with fixed attributes in Orion
+curl -s -o /dev/null -X POST \
+  "http://orion-v2:$ORION_PORT/v2/op/update" \
+  -H 'Content-Type: application/json' \
+  -H 'fiware-service: openiot' \
+  -H 'fiware-servicepath: /' \
+  -d '{
+        "actionType": "append",
+        "entities": [
+            {
+                "id": "AC:ac01ToscanaIFlat1A",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 1A Living Room" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat1A:livingroom" }
+            },
+            {
+                "id": "AC:ac02ToscanaIFlat1A",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 1A Bedroom" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat1A:bedroom" }
+            },
+            {
+                "id": "AC:ac03ToscanaIFlat1A",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 1A Kitchen" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat1A:kitchen" }
+            },
+            {
+                "id": "AC:ac04ToscanaIFlat1A",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 1A Bathroom" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat1A:bathroom" }
+            },
+            {
+                "id": "AC:ac01ToscanaIFlat1B",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 1B Living Room" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat1B:livingroom" }
+            },
+            {
+                "id": "AC:ac02ToscanaIFlat1B",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 1B Bedroom" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat1B:bedroom" }
+            },
+            {
+                "id": "AC:ac03ToscanaIFlat1B",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 1B Kitchen" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat1B:kitchen" }
+            },
+            {
+                "id": "AC:ac04ToscanaIFlat1B",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 1B Bathroom" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat1B:bathroom" }
+            },
+            {
+                "id": "AC:ac01ToscanaIFlat2A",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 2A Living Room" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat2A:livingroom" }
+            },
+            {
+                "id": "AC:ac02ToscanaIFlat2A",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 2A Bedroom" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat2A:bedroom" }
+            },
+            {
+                "id": "AC:ac03ToscanaIFlat2A",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 2A Kitchen" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat2A:kitchen" }
+            },
+            {
+                "id": "AC:ac04ToscanaIFlat2A",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 2A Bathroom" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat2A:bathroom" }
+            },
+            {
+                "id": "AC:ac01ToscanaIFlat2B",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 2B Living Room" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat2B:livingroom" }
+            },
+            {
+                "id": "AC:ac02ToscanaIFlat2B",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 2B Bedroom" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat2B:bedroom" }
+            },
+            {
+                "id": "AC:ac03ToscanaIFlat2B",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 2B Kitchen" },
+                "refRoom": { "type": "Relationship",    "value": "urn:ngsi-ld:ToscanaIFlat2B:kitchen" }
+            },
+            {
+                "id": "AC:ac04ToscanaIFlat2B",
+                "type": "AC",
+                "name": { "type": "Text", "value": "AC Unit for ToscanaI Flat 2B Bathroom" },
+                "refRoom": { "type": "Relationship", "value": "urn:ngsi-ld:ToscanaIFlat2B:bathroom" }
+            }
+        ]
+    }'
+
+
+
+
+
+
+### 1.- Provision a service for AC Units
+curl -s -o /dev/null -X POST \
+  "http://iot-agent:$IOTA_NORTH_PORT/iot/services" \
+  -H 'Content-Type: application/json' \
+  -H 'fiware-service: openiot' \
+  -H 'fiware-servicepath: /' \
+  -d '{
+        "services":[
+                {
+                    "apikey": "acunitapikey",
+                    "cbroker": "http://orion-v2:'${ORION_PORT}'",
+                    "entity_type": "AC",
+                    "resource": "",
+                    "protocol": "PDI-IoTA-UltraLight",
+                    "transport": "MQTT",
+                    "timezone": "Europe/Madrid",
+                    "attributes": [
+                        { "object_id": "t", "name": "temperature", "type": "Number", "metadata":{
+                            "unitCode": { "type": "Text", "value": "CEL" }
+                        }},
+                        { "object_id": "h", "name": "humidity", "type": "Number", "metadata": {
+                        "unitCode": { "type": "Text", "value": "P1" }
+                        }}
+                    ],
+                    "commands": [
+                        { "name": "AC", "type": "command" },
+                        { "name": "Heat", "type": "command" }
+                    ]
+                }
+            ]
+        }'
+
+### 2.- Provision Devices (sensors) in IoT Agent
+curl -s -o /dev/null -X POST \
+  "http://iot-agent:$IOTA_NORTH_PORT/iot/devices" \
+  -H 'Content-Type: application/json' \
+  -H 'fiware-service: openiot' \
+  -H 'fiware-servicepath: /' \
+  -d '{
+        "devices": [
+            {
+                "device_id": "ac01ToscanaIFlat1A",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac02ToscanaIFlat1A",
+                "entity_type": "AC"
+            },
+            {   
+                "device_id": "ac03ToscanaIFlat1A",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac04ToscanaIFlat1A",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac01ToscanaIFlat1B",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac02ToscanaIFlat1B",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac03ToscanaIFlat1B",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac04ToscanaIFlat1B",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac01ToscanaIFlat2A",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac02ToscanaIFlat2A",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac03ToscanaIFlat2A",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac04ToscanaIFlat2A",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac01ToscanaIFlat2B",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac02ToscanaIFlat2B",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac03ToscanaIFlat2B",
+                "entity_type": "AC"
+            },
+            {
+                "device_id": "ac04ToscanaIFlat2B",
+                "entity_type": "AC"
+            }   
+        ]
+    }'
