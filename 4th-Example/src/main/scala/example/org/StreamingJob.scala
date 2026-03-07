@@ -88,69 +88,79 @@ object StreamingJob {
    * is received and there is no corresponding reading from the other stream within a specified timeout, it outputs a SensorTempHumReading with NaN for the missing value.
    */
   class SensorTempHumWithTimeout(timeout: Long) extends KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading] {
-    private var lastTempState: ValueState[SensorTempReading] = _
-    private var lastHumState: ValueState[SensorHumReading] = _
-    private var timerState: ValueState[Long] = _
-    private var _timeout: Long = timeout
+    private var lastTempState: ValueState[SensorTempReading] = _      // State to hold the last temperature reading for each sensor
+    private var lastHumState: ValueState[SensorHumReading] = _        // State to hold the last humidity reading for each sensor
+    private var timerState: ValueState[Long] = _                      // State to hold the timestamp of the registered timer for each sensor
+    private var _timeout: Long = timeout                              // TimeOut duration in milliseconds
 
     override def open(parameters: Configuration): Unit = {
-      lastTempState = getRuntimeContext.getState(new ValueStateDescriptor[SensorTempReading]("lastTempState", classOf[SensorTempReading]))
+      // Initialization of States
+      lastTempState = getRuntimeContext.getState(new ValueStateDescriptor[SensorTempReading]("lastTempState", classOf[SensorTempReading]))  
       lastHumState = getRuntimeContext.getState(new ValueStateDescriptor[SensorHumReading]("lastHumState", classOf[SensorHumReading]))
       timerState = getRuntimeContext.getState(new ValueStateDescriptor[Long]("timerState", classOf[Long]))
     }
 
-    override def processElement1(temp: SensorTempReading, ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, out: Collector[SensorTempHumReading]): Unit = {
-      val hum = lastHumState.value()
-      if (hum != null) {
-        out.collect(SensorTempHumReading(temp.id, temp.temperature, hum.humidity).computeHeatIndex())
-        lastHumState.clear()
-        clearTimeout(ctx)
+    // What happens when a new temperature is received
+    override def processElement1(temp: SensorTempReading, 
+          ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, 
+          out: Collector[SensorTempHumReading]): Unit = {
+      val hum = lastHumState.value()    // Obtain last humidity reading for the current sensor from state  
+      if (hum != null) {                // If there is a humidity reading, output the combined reading and clear the states and timer
+        out.collect(SensorTempHumReading(temp.id, temp.temperature, hum.humidity).computeHeatIndex()) // Output combined reading with computed heat index
+        lastHumState.clear()            // Clear humidity state for the current sensor. No further use is required.
+        clearTimeout(ctx)               // Clear timer; the wait is over.
       } else {
-        lastTempState.update(temp)
-        setupTimeout(ctx, _timeout)
+        lastTempState.update(temp)      // There isn't a previous humidity reading => Update temperature state for the current sensor
+        setupTimeout(ctx, _timeout)     // Set up a timer. Waiting for humidity reading.
       }
     }
 
-    override def processElement2(hum: SensorHumReading, ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, out: Collector[SensorTempHumReading]): Unit = {
-      val temp = lastTempState.value()
-      if (temp != null) {
-        out.collect(SensorTempHumReading(hum.id, temp.temperature, hum.humidity).computeHeatIndex())
-        lastTempState.clear()
-        clearTimeout(ctx)
+    // What happens when a new humidity is received
+    override def processElement2(hum: SensorHumReading, 
+          ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, 
+          out: Collector[SensorTempHumReading]): Unit = {
+      val temp = lastTempState.value()    //Obtain last temperature reading for the current sensor from state
+      if (temp != null) {                 // If there is a temperature reading, output the combined reading and clear the states and timer
+        out.collect(SensorTempHumReading(hum.id, temp.temperature, hum.humidity).computeHeatIndex())  // Output combined reading with computed heat index
+        lastTempState.clear()             // Clear temperature state for the current sensor. No further use is required.
+        clearTimeout(ctx)                 // Clear timer; the wait is over.
       } else {
-        lastHumState.update(hum)
-        setupTimeout(ctx, _timeout)
+        lastHumState.update(hum)          // There isn't a previous temperature reading => Update humidity state for the current sensor
+        setupTimeout(ctx, _timeout)       // Set up a timer. Waiting for temperature reading.
       }
     }
 
+    // What happens when a timer is triggered
     override def onTimer(timestamp: Long, ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#OnTimerContext, out: Collector[SensorTempHumReading]): Unit = {
 
       if (timerState.value() == timestamp) { //The timer is triggered for the current key
         if (lastTempState.value() != null) { // There is a temp reading but no hum reading
-          out.collect(SensorTempHumReading(lastTempState.value().id, lastTempState.value().temperature, Double.NaN).computeHeatIndex())
-          lastTempState.clear()
+          out.collect(SensorTempHumReading(lastTempState.value().id, lastTempState.value().temperature, Double.NaN).computeHeatIndex()) // Output combined reading with computed heat index (NaN for humidity)
+          lastTempState.clear()             // Clear temperature state for the current sensor. No further use is required.
         }
         if (lastHumState.value() != null) { // There is a hum reading but no temp reading
-          out.collect(SensorTempHumReading(lastHumState.value().id, Double.NaN, lastHumState.value().humidity).computeHeatIndex())
-          lastHumState.clear()
+          out.collect(SensorTempHumReading(lastHumState.value().id, Double.NaN, lastHumState.value().humidity).computeHeatIndex())  //Output combined reading with computed heat index (NaN for temperature)
+          lastHumState.clear()              // Clear humidity state for the current sensor. No further use is required.
         }
       }
     } 
 
+    // Helper methods to set up timers
     private def setupTimeout(ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, timeout: Long): Unit = {
       val timeoutTimestamp: java.lang.Long = timerState.value()
       if (timeoutTimestamp == null) {
-          val timeoutTimestamp = ctx.timerService().currentProcessingTime() + timeout
-          ctx.timerService().registerProcessingTimeTimer(timeoutTimestamp)
-          timerState.update(timeoutTimestamp)
+          val timeoutTimestamp = ctx.timerService().currentProcessingTime() + timeout  // Set the timeout timestamp to the current processing time plus the specified timeout duration
+          ctx.timerService().registerProcessingTimeTimer(timeoutTimestamp)      // Register a processing time timer for the calculated timeout timestamp
+          timerState.update(timeoutTimestamp)                                   // Update the timer state with the registered timer's timestamp
         }
     }
 
+    // Helper method to clear timers
     private def clearTimeout(ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context): Unit = {
       val timeoutTimestamp: java.lang.Long = timerState.value()
       if (timeoutTimestamp != null) {
-        ctx.timerService().deleteProcessingTimeTimer(timeoutTimestamp)
-        timerState.clear()
+        ctx.timerService().deleteProcessingTimeTimer(timeoutTimestamp) // Clear the registered timer for the current sensor
+        timerState.clear()                                             // Clear the timer state 
       }
     }
   }
