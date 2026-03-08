@@ -100,7 +100,7 @@ object StreamingJob {
       timerState = getRuntimeContext.getState(new ValueStateDescriptor[Long]("timerState", classOf[Long]))
     }
 
-    // What happens when a new temperature is received
+    // What happends when a new temperature is received
     override def processElement1(temp: SensorTempReading, 
           ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, 
           out: Collector[SensorTempHumReading]): Unit = {
@@ -115,7 +115,7 @@ object StreamingJob {
       }
     }
 
-    // What happens when a new humidity is received
+    // What happends when a new humidity is received
     override def processElement2(hum: SensorHumReading, 
           ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, 
           out: Collector[SensorTempHumReading]): Unit = {
@@ -130,7 +130,7 @@ object StreamingJob {
       }
     }
 
-    // What happens when a timer is triggered
+    // What happends when a timer is triggered
     override def onTimer(timestamp: Long, ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#OnTimerContext, out: Collector[SensorTempHumReading]): Unit = {
 
       if (timerState.value() == timestamp) { //The timer is triggered for the current key

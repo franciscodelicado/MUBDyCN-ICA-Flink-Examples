@@ -71,19 +71,15 @@ object StreamingJob {
     val Hums: DataStream[SensorHumReading] = sensorHumData
       .keyBy(_.id)
 
-    // val TempsAndHums: DataStream[SensorTempHumReading] = Temps
-    //   .connect(Hums)
-    //   .process(new SensorTempHumWithTimeout(2000L))
-
     val TempsAndHumsJson: DataStream[String] = Temps
-      .connect(Hums)
-      .process(new SensorTempHumWithTimeout(2000L))
-      .map(value =>
+      .connect(Hums)                                      // Combine the two data stream
+      .process(new SensorTempHumWithTimeout(2000L))       
+      .map(value =>                                       // Transform the combined sensor readings into a JSON string format to be written in Cassandra BB.DD.
         s"""{"id": "${value.id}", "temperature": ${value.temperature}, "temp_timestamp": "${value.timestampTemperature}", "humidity": ${value.humidity}, "humidity_timestamp": "${value.timestampHumidity}"}"""
       )
 
     TempsAndHumsJson
-      .addSink(new CassandraJsonSink("cassandra", 9042, "flink", "sensor_readings"))
+      .addSink(new CassandraJsonSink("cassandra", 9042, "flinkdb", "sensor_readings"))
   
     // 4.- Set up the Sink of DataStream
     sensorTempData
@@ -109,69 +105,81 @@ object StreamingJob {
    * is received and there is no corresponding reading from the other stream within a specified timeout, it outputs a SensorTempHumReading with NaN for the missing value.
    */
   class SensorTempHumWithTimeout(timeout: Long) extends KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading] {
-    private var lastTempState: ValueState[SensorTempReading] = _
-    private var lastHumState: ValueState[SensorHumReading] = _
-    private var timerState: ValueState[Long] = _
-    private var _timeout: Long = timeout
+    private var lastTempState: ValueState[SensorTempReading] = _      // State to hold the last temperature reading for each sensor
+    private var lastHumState: ValueState[SensorHumReading] = _        // State to hold the last humidity reading for each sensor
+    private var timerState: ValueState[Long] = _                      // State to hold the timestamp of the registered timer for each sensor
+    private var _timeout: Long = timeout                              // TimeOut duration in millisecons
 
     override def open(parameters: Configuration): Unit = {
+      // Initialization of States
       lastTempState = getRuntimeContext.getState(new ValueStateDescriptor[SensorTempReading]("lastTempState", classOf[SensorTempReading]))
       lastHumState = getRuntimeContext.getState(new ValueStateDescriptor[SensorHumReading]("lastHumState", classOf[SensorHumReading]))
       timerState = getRuntimeContext.getState(new ValueStateDescriptor[Long]("timerState", classOf[Long]))
     }
 
-    override def processElement1(temp: SensorTempReading, ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, out: Collector[SensorTempHumReading]): Unit = {
-      val hum = lastHumState.value()
-      if (hum != null) {
-        out.collect(SensorTempHumReading(temp.id, temp.temperature, temp.timestamp, hum.humidity, hum.timestamp))
-        lastHumState.clear()
-        clearTimeout(ctx)
+    // What happends when a new temperature is received
+    override def processElement1(temp: SensorTempReading, 
+              ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, 
+              out: Collector[SensorTempHumReading]): Unit = {
+      val hum = lastHumState.value()            // Obtain the last humidity reading for the current sensor from the state
+      if (hum != null) {                        // If there is a humidity reading, output a combined reading and clear the states and timer
+        out.collect(SensorTempHumReading(temp.id, temp.temperature, temp.timestamp, hum.humidity, hum.timestamp)) // Output a combined reading with the temperature and humidity values
+        lastHumState.clear()                    // Clear the humidity state for the current sensor
+        clearTimeout(ctx)                       // Clear the timer for the current sensor 
       } else {
-        lastTempState.update(temp)
-        setupTimeout(ctx, _timeout)
+        lastTempState.update(temp)              // There isn't a previous humidity reading => Update temperature state for current sensor
+        setupTimeout(ctx, _timeout)             // Set up a timer. Waiting for humidity reading.
       }
     }
 
-    override def processElement2(hum: SensorHumReading, ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, out: Collector[SensorTempHumReading]): Unit = {
-      val temp = lastTempState.value()
-      if (temp != null) {
-        out.collect(SensorTempHumReading(hum.id, temp.temperature, temp.timestamp, hum.humidity, hum.timestamp))
-        lastTempState.clear()
-        clearTimeout(ctx)
+    // What happends when a new humidity is received
+    override def processElement2(hum: SensorHumReading, 
+              ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, 
+              out: Collector[SensorTempHumReading]): Unit = {
+      val temp = lastTempState.value()          // Obtain the last temperature reading for current sensor from the state
+      if (temp != null) {                       // The previous temperature reading exits
+        out.collect(SensorTempHumReading(hum.id, temp.temperature, temp.timestamp, hum.humidity, hum.timestamp)) // Output a combined reading with the temperature and humidity values
+        lastTempState.clear()                   // Clear the temperature state for current sensor
+        clearTimeout(ctx)                       // Clear the timer for the current sensor
       } else {
-        lastHumState.update(hum)
-        setupTimeout(ctx, _timeout)
+        lastHumState.update(hum)                // There isn't a previous temperature reading => Update humidity state for current sensor
+        setupTimeout(ctx, _timeout)             // Set up a timer. Waiting for temperature reading.
       }
     }
 
+    // What happends when a timer is triggered   
     override def onTimer(timestamp: Long, ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#OnTimerContext, out: Collector[SensorTempHumReading]): Unit = {
 
       if (timerState.value() == timestamp) { //The timer is triggered for the current key
         if (lastTempState.value() != null) { // There is a temp reading but no hum reading
-          out.collect(SensorTempHumReading(lastTempState.value().id, lastTempState.value().temperature, lastTempState.value().timestamp, Double.NaN,""))
-          lastTempState.clear()
+          out.collect(SensorTempHumReading(lastTempState.value().id, lastTempState.value().temperature, lastTempState.value().timestamp, Double.NaN,"")) // Output combined reading with computed heat index (NaN for humidity)
+          lastTempState.clear()       // Clear temperature state for the current sensor. No further use is required.
         }
         if (lastHumState.value() != null) { // There is a hum reading but no temp reading
-          out.collect(SensorTempHumReading(lastHumState.value().id, Double.NaN, "",lastHumState.value().humidity,lastHumState.value().timestamp))
-          lastHumState.clear()
+          out.collect(SensorTempHumReading(lastHumState.value().id, Double.NaN, "",lastHumState.value().humidity,lastHumState.value().timestamp))   //Output combined reading with computed heat index (NaN for temperature)          
+          lastHumState.clear()        // Clear humidity state for the current sensor. No further use is required.
         }
       }
     } 
 
-    private def setupTimeout(ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, timeout: Long): Unit = {
+    // Helper methods to set up timers
+    private def setupTimeout(ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context, 
+                timeout: Long): Unit = {
       val timeoutTimestamp: java.lang.Long = timerState.value()
       if (timeoutTimestamp == null) {
-          val timeoutTimestamp = ctx.timerService().currentProcessingTime() + timeout
-          ctx.timerService().registerProcessingTimeTimer(timeoutTimestamp)
-          timerState.update(timeoutTimestamp)
+          val timeoutTimestamp = ctx.timerService().currentProcessingTime() + timeout // Set the timeout timestamp to the current processing time plus the specified timeout duration
+          ctx.timerService().registerProcessingTimeTimer(timeoutTimestamp)  // Register a processing time timer for the calculated timeout timestamp
+          timerState.update(timeoutTimestamp)                               // Update the timer state with the registered timer's timestamp
+        }
         }
     }
 
+    // Helper method to clear timers
     private def clearTimeout(ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context): Unit = {
       val timeoutTimestamp: java.lang.Long = timerState.value()
       if (timeoutTimestamp != null) {
-        ctx.timerService().deleteProcessingTimeTimer(timeoutTimestamp)
-        timerState.clear()
+        ctx.timerService().deleteProcessingTimeTimer(timeoutTimestamp)      // Clear the registered timer for the current sensor
+        timerState.clear()                                                  // Clear the timer state 
       }
     }
   }
@@ -182,6 +190,14 @@ object StreamingJob {
         humidity: Double,
         timestampHumidity: String)
 
+
+  /**
+  *   Sink to write JSON string in Cassandra BB.DD.
+     @param host: Cassandra host
+     @param port: Cassandra port
+     @param keyspace: Cassandra keyspace
+     @param table: Cassandra table in JSON format  
+  */
   class CassandraJsonSink(host: String, port: Int, keyspace: String, table: String)
       extends RichSinkFunction[String] {
     @transient private var cluster: Cluster = _
@@ -197,13 +213,17 @@ object StreamingJob {
 
       while (!connected && attempt <= maxRetries) {
         try {
+          // Connect to Cassandra 
           cluster = Cluster.builder().addContactPoint(host).withPort(port).build()
           session = cluster.connect()
 
+          // Create a "BB.DD." for our data if it doesn't exist
           session.execute(
             s"CREATE KEYSPACE IF NOT EXISTS $keyspace WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}"
           )
 
+          // Set up table in our "BB.DD." if it doesn't exist
+          // IMPORTANT: keys of table must be similar to keys of JSON that will be pass to this sink 
           session.execute(
             s"""CREATE TABLE IF NOT EXISTS $keyspace.$table (
                |id text,
@@ -215,9 +235,9 @@ object StreamingJob {
                |)""".stripMargin
           )
 
-          insertJsonStmt = session.prepare(s"INSERT INTO $keyspace.$table JSON ?")
+          insertJsonStmt = session.prepare(s"INSERT INTO $keyspace.$table JSON ?") // Set up how data will be inserted: in this case as JSON String
           connected = true
-        } catch {
+        } catch {               // Retry whether connection has failed
           case error: Throwable =>
             lastError = error
             if (cluster != null) {
@@ -234,10 +254,12 @@ object StreamingJob {
       }
     }
 
+    // Write data in Cassandra BB.DD.
     override def invoke(value: String): Unit = {
       session.execute(insertJsonStmt.bind(value))
     }
 
+    // Close Cassandra BB.DD.
     override def close(): Unit = {
       if (session != null) {
         session.close()
