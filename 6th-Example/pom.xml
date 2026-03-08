@@ -77,6 +77,12 @@ under the License.
 
 		<!-- Add connector dependencies here. They must be in the default scope (compile). -->
 
+		<dependency>
+			<groupId>com.datastax.cassandra</groupId>
+			<artifactId>cassandra-driver-core</artifactId>
+			<version>3.11.5</version>
+		</dependency>
+
 		<!-- Example:
 
 		<dependency>

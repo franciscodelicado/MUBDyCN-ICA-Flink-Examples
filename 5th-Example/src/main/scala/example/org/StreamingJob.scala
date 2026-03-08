@@ -67,11 +67,14 @@ object StreamingJob {
   
 
   class AverageSlideWindowTemp extends ProcessWindowFunction[SensorTempReading, AverageSensorTempReading, String, TimeWindow] {
-    override def process(key: String, context: Context, elements: Iterable[SensorTempReading], out: Collector[AverageSensorTempReading]): Unit = {
-      val sum = elements.map(_.temperature).sum
-      val count = elements.size
-      val average = sum / count
-      out.collect(AverageSensorTempReading(key, average))
+    override def process(key: String, 
+                        context: Context, 
+                        elements: Iterable[SensorTempReading], 
+                        out: Collector[AverageSensorTempReading]): Unit = {
+      val sum = elements.map(_.temperature).sum             // Add up all the temperature readings in the window
+      val count = elements.size                             // Count the number of readings in the window    
+      val average = sum / count                             // Compute the average temperature for the sensor in the window 
+      out.collect(AverageSensorTempReading(key, average))   // Emit the average temperature reading for the sensor in the window
     }
   }
   
