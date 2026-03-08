@@ -171,8 +171,8 @@ object StreamingJob {
           ctx.timerService().registerProcessingTimeTimer(timeoutTimestamp)  // Register a processing time timer for the calculated timeout timestamp
           timerState.update(timeoutTimestamp)                               // Update the timer state with the registered timer's timestamp
         }
-        }
-    }
+      }
+    
 
     // Helper method to clear timers
     private def clearTimeout(ctx: KeyedCoProcessFunction[String, SensorTempReading, SensorHumReading, SensorTempHumReading]#Context): Unit = {
