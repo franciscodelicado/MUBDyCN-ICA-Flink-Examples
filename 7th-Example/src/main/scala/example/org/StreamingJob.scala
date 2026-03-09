@@ -110,21 +110,13 @@ object StreamingJob {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     // Set the time characteristic to EventTime in order to use the timestamp field of the SensorTempReading for generating watermarks and processing windows based on event time. This allows for more accurate handling of out-of-order events and late data.
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-    // Set the auto watermark interval to 5 seconds to ensure that watermarks are generated and emitted at regular intervals, allowing for timely processing of the data and handling of late events. This is important for the correct functioning of event time windows and ensuring that results are produced in a timely manner.
-    // env.getConfig.setAutoWatermarkInterval(5000L)
-
-    val eventStream = env.addSource(
-      new OrionSource(9001)
-    ) // Set up a DataStream from OrionSource.
+    
+    val eventStream = env.addSource(new OrionSource(9001)) // Set up a DataStream from OrionSource.
     val sensorTempDataWithTimestamps = eventStream
-      .flatMap(event =>
-        event.entities
-      ) // Obtain the payload of the HTTP POST request sent by Orion.
+      .flatMap(event => event.entities) // Obtain the payload of the HTTP POST request sent by Orion.
       .map(new SensorMapFunction) // Parse the data sent by Orion.
       .assignTimestampsAndWatermarks( // Assign timestamps and watermarks to DataStream.
-        new BoundedOutOfOrdernessTimestampExtractor[SensorReading](
-          Time.seconds(1)
-        ) {
+        new BoundedOutOfOrdernessTimestampExtractor[SensorReading](Time.seconds(1)) {
           override def extractTimestamp(element: SensorReading): Long = {
             element.time
           }
@@ -137,14 +129,10 @@ object StreamingJob {
 
     val acControl = sensorTempDataWithTimestamps
       .keyBy(_.id)
-      .process(
-        new ACControlProcessFunction
-      ) // Detect trends in the input data and generate ACControl objects with the desired action for each AC unit based on the temperature readings.
+      .process(new ACControlProcessFunction) // Detect trends in the input data and generate ACControl objects with the desired action for each AC unit based on the temperature readings.
 
-    val commad2Orion = acControl
-      .flatMap(
-        new OrionCommandMapper
-      ) // Is necessary to use flatMap instead of map because we want to filter out the ACControl objects with action NONE and we want to keep track of the last action for each AC unit to avoid sending redundant commands to Orion
+    val commad2Orion: DataStream[OrionSinkObject] = acControl
+      .flatMap(new OrionCommandMapper) // Is necessary to use flatMap instead of map because we want to filter out the ACControl objects with action NONE and we want to keep track of the last action for each AC unit to avoid sending redundant commands to Orion
 
     OrionSink.addSink(commad2Orion)
 
@@ -161,40 +149,11 @@ object StreamingJob {
     */
   class SensorMapFunction extends MapFunction[Entity, SensorReading] {
 
-    /** Entity(AC:ac01ToscanaIFlat1A,AC,AC Unit for ToscanaI Flat 1A Living
-      * Room,Map(name -> Measurement(AC Unit for ToscanaI Flat 1A Living
-      * Room,,2026-02-16T18:11:32.445), temperature ->
-      * Measurement(16.72,CEL,2026-02-16T18:11:32.432), refRoom ->
-      * Measurement(urn:ngsi-ld:ToscanaIFlat1A:livingroom,,2026-02-16T18:11:32.445),
-      * TimeInstant ->
-      * Measurement(2026-02-16T18:11:32.432Z,,2026-02-16T18:11:32.445), humidity
-      * -> Measurement(52.16,P1,2026-02-16T18:11:32.432))) => Sensor
-      * (AC:ac01ToscanaIFlat1A, 16.72 , 52.16)
-      */
-
     override def map(entity: Entity): SensorReading = {
-      //    val attrs = entity.attrs //Parse attrs to Scala Map[String, Any]
-      val temp = entity
-        .attrs("temperature")
-        .value
-        .asInstanceOf[Double] // Get temperature attribute as Option[Any]
-      val metadata = entity
-        .attrs("temperature")
-        .metadata
-        .asInstanceOf[Map[
-          String,
-          Any
-        ]] // Get metadata of temperature attribute as Option[Any]
-      // println(s"Metadata of temperature attribute: $metadata")
-      val timeTempStr = metadata
-        .get("TimeInstant")
-        .map(_.asInstanceOf[Map[String, Any]])
-        .get("value")
-        .asInstanceOf[String]
-      // println(s"TimeInstant value from metadata: $timeTempStr")
-
+      val temp = entity.attrs("temperature").value.asInstanceOf[Double] // Get temperature attribute as Option[Any]
+      val metadata = entity.attrs("temperature").metadata.asInstanceOf[Map[String, Any]]// Get metadata of temperature attribute as Option[Any]
+      val timeTempStr = metadata.get("TimeInstant").map(_.asInstanceOf[Map[String, Any]]).get("value").asInstanceOf[String]
       val timestamp = try { // Parse TimeInstant string to epoch milliseconds
-        val formatter = DateTimeFormatter.ISO_INSTANT
         java.time.Instant.parse(timeTempStr).toEpochMilli
       } catch {
         case _: Exception => System.currentTimeMillis
@@ -205,11 +164,7 @@ object StreamingJob {
   }
 }
 
-case class SensorReading(
-    id: String,
-    temperature: Double,
-    time: Long
-) // Represent the a sensor reading to be used for AC control
+case class SensorReading(id: String, temperature: Double, time: Long) // Represent the a sensor reading to be used for AC control
 
 /** Function to check if temperature of SensorReading follows a certain trend
   * and generate an ACControl object with the desired action for the AC unit. .-
@@ -229,8 +184,7 @@ class ACControlProcessFunction
       )
     )
 
-  override def processElement(
-      sensorReading: SensorReading,
+  override def processElement(sensorReading: SensorReading,
       ctx: KeyedProcessFunction[String, SensorReading, ACControl]#Context,
       out: Collector[ACControl]
   ): Unit = {
@@ -240,21 +194,12 @@ class ACControlProcessFunction
     ctx.timerService().registerEventTimeTimer(sensorReading.time)
   }
 
-  override def onTimer(
-      timestamp: Long,
-      ctx: KeyedProcessFunction[
-        String,
-        SensorReading,
-        ACControl
-      ]#OnTimerContext,
+  override def onTimer(timestamp: Long,
+      ctx: KeyedProcessFunction[String, SensorReading, ACControl]#OnTimerContext,
       out: Collector[ACControl]
   ): Unit = {
     // 3.- When the timer is triggered, we check the last 3 sensor readings and generate an ACControl object with the desired action for the AC unit based on the temperature readings.
-    val lastSensorReadings = lastSensorReadingsState
-      .values()
-      .iterator()
-      .asScala
-      .toList
+    val lastSensorReadings = lastSensorReadingsState.values().iterator().asScala.toList
       .sortBy(_.time) // Sort the sensor readings by timestamp
       .filter(
         _.time <= timestamp
@@ -266,9 +211,7 @@ class ACControlProcessFunction
       return
     }
 
-    lastSensorReadings.sortBy(
-      _.temperature
-    ) // Sort the sensor readings by temperature
+    lastSensorReadings.sortBy(_.temperature) // Sort the sensor readings by temperature
     // Now:
     //    * if head of sorted list is > 21.5 => all of then are
     //    * if tail of sorted list is < 20 => all of then are
@@ -283,7 +226,7 @@ class ACControlProcessFunction
       )
       out.collect(ACControl(lastSensorReadings.head.id, ACAction.HEAT))
     } else if (
-      lastSensorReadings.head.temperature >= 20 && lastSensorReadings.last.temperature <= 25
+      lastSensorReadings.head.temperature >= 20 && lastSensorReadings.last.temperature <= 21.5
     ) {
       print(
         s"Action: OFF for device ${lastSensorReadings.head.id}" + s" based on temperatures: ${lastSensorReadings.map(_.temperature)}"
@@ -318,8 +261,7 @@ class OrionCommandMapper extends FlatMapFunction[ACControl, OrionSinkObject] {
   final val CONTENT_TYPE = ContentType.JSON
   final val METHOD = HTTPMethod.PATCH
   final val ORION_URL = "http://orion:1026/v2/entities"
-  final val HEADERS =
-    Map("fiware-service" -> "openiot", "fiware-servicepath" -> "/")
+  final val HEADERS = Map("fiware-service" -> "openiot", "fiware-servicepath" -> "/")
 
   var lastACAction: ACAction = ACAction.NONE
 
