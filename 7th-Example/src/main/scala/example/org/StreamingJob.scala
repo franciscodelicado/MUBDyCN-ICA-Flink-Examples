@@ -39,8 +39,6 @@ import java.time.{Instant, ZoneId, ZonedDateTime}
 
 import org.fiware.cosmos.orion.flink.connector._
 
-import com.datastax.driver.core.{Cluster, PreparedStatement, Session}
-import org.apache.flink.streaming.api.functions.sink.RichSinkFunction
 
 /** This example demonstrates: 1.- how to use OrionSource and parse the incoming
   * data 2.- how to detect trends in input data and take action based on them

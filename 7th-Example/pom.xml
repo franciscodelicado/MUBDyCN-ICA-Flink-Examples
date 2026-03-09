@@ -74,21 +74,14 @@ under the License.
 			<version>${scala.version}</version>
 			<scope>provided</scope>
 		</dependency>
-		<!-- Add Orion connector dependency -->
 		<dependency>
-            <groupId>org.fiware.cosmos</groupId>
-            <artifactId>orion.flink.connector</artifactId>
-            <version>1.2.4</version>
-            <scope>compile</scope>
-        </dependency>
+			<groupId>org.fiware.cosmos</groupId>
+			<artifactId>orion.flink.connector</artifactId>
+			<version>1.2.4</version>
+			<scope>compile</scope>
+		</dependency>
 
 		<!-- Add connector dependencies here. They must be in the default scope (compile). -->
-
-		<dependency>
-			<groupId>com.datastax.cassandra</groupId>
-			<artifactId>cassandra-driver-core</artifactId>
-			<version>3.11.5</version>
-		</dependency>
 
 		<!-- Example:
 
