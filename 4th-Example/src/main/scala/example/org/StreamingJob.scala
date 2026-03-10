@@ -53,14 +53,9 @@ object StreamingJob {
     val sensorHumData: DataStream[SensorHumReading] = env.addSource(new SensorHum(4, 5000L))
 
     // 3.- Transformations on the DataStream    
-    val Temps: DataStream[SensorTempReading] = sensorTempData
-      .keyBy(_.id)
-
-    val Hums: DataStream[SensorHumReading] = sensorHumData
-      .keyBy(_.id)
-
-    val TempsAndHums: DataStream[SensorTempHumReading] = Temps
-      .connect(Hums)
+   val TempsAndHums: DataStream[SensorTempHumReading] = sensorTempData
+      .connect(sensorHumData)
+      .keyBy(_.id, _.id)
       .process(new SensorTempHumWithTimeout(2000L))
   
     // 4.- Set up the Sink of DataStream
